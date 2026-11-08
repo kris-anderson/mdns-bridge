@@ -71,6 +71,7 @@ unsigned int set_interface_list(
             fatal("Cannot allocate memory: %s\n", strerror(errno));
         }
         configured_interface_list[index].index = index;
+        configured_interface_list[index].outbound_filter_options = OUTBOUND_FILTER_DEFAULT;
     }
 
     configured_interface_count = count;
@@ -110,6 +111,23 @@ filter_list_t * get_filter_list_for_peer(
     }
 
     return interface->outbound_filter_list;
+}
+
+
+//
+// Get the outbound filter options an interface uses for a peer
+//
+static unsigned int get_filter_options_for_peer(
+    interface_t *               interface,
+    interface_t *               peer)
+{
+    // Options only have an effect when there is a filter list
+    if (get_filter_list_for_peer(interface, peer) == NULL)
+    {
+        return OUTBOUND_FILTER_DEFAULT;
+    }
+
+    return interface->outbound_filter_options;
 }
 
 
@@ -174,6 +192,7 @@ static void build_interface_dest_lists(
     interface_t *               interface;
     interface_t *               peer;
     filter_list_t *             filter_list;
+    unsigned int                filter_options;
     dest_filter_list_t *        dest_filter_list;
     dest_filter_list_t **       work_list;
     dest_filter_list_t *        work_list_slot;
@@ -215,13 +234,14 @@ static void build_interface_dest_lists(
                 continue;
             }
 
-            // Get the filter list used by the peer for this interface
+            // Get the filter list and options used by the peer for this interface
             filter_list = get_filter_list_for_peer(peer, interface);
+            filter_options = get_filter_options_for_peer(peer, interface);
 
             // Is the filter already in the list?
             for (index = 0; index < work_list_used; index++)
             {
-                if (work_list[index]->filter == filter_list)
+                if (work_list[index]->filter == filter_list && work_list[index]->filter_options == filter_options)
                 {
                     break;
                 }
@@ -235,6 +255,7 @@ static void build_interface_dest_lists(
 
                 // Add the filter to the list
                 work_list_slot->filter = filter_list;
+                work_list_slot->filter_options = filter_options;
                 work_list_slot->peer_list[0] = peer;
                 work_list_slot->peer_count = 1;
 
@@ -248,9 +269,10 @@ static void build_interface_dest_lists(
                         continue;
                     }
 
-                    // Check the filter list used by the peer for this interface
+                    // Check the filter list and options used by the peer for this interface
                     filter_list = get_filter_list_for_peer(peer, interface);
-                    if (filter_list == work_list_slot->filter)
+                    filter_options = get_filter_options_for_peer(peer, interface);
+                    if (filter_list == work_list_slot->filter && filter_options == work_list_slot->filter_options)
                     {
                         work_list_slot->peer_list[work_list_slot->peer_count] = peer;
                         work_list_slot->peer_count++;
@@ -280,8 +302,9 @@ static void build_interface_dest_lists(
             }
             interface->dest_filter_list[ip_type][index] = dest_filter_list;
 
-            // Copy the filter and peer list from the work list slot
+            // Copy the filter, options and peer list from the work list slot
             dest_filter_list->filter = work_list_slot->filter;
+            dest_filter_list->filter_options = work_list_slot->filter_options;
             dest_filter_list->peer_count = work_list_slot->peer_count;
             for (peer_index = 0; peer_index < work_list_slot->peer_count; peer_index++)
             {

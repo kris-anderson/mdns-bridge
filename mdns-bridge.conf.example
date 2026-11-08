@@ -67,6 +67,12 @@
   # An optional comma separated list of outbound filters to deny
   #deny-outbound-filters = _ssh
 
+  # Whether outbound filters apply to queries.
+  #outbound-filter-queries = yes
+
+  # Whether outbound filters apply to address (A/AAAA) and NSEC records.
+  #outbound-filter-addresses = no
+
 [igc0]
   # Optionally Disable ipv4.
   #disable-ipv4 = no

@@ -386,6 +386,7 @@ static unsigned int dns_encode_queries(
     packet_t *                  send_packet,
     unsigned int                packet_offset,
     const filter_list_t *       send_filter_list,
+    const unsigned int          filter_options,
     unsigned int *              allowed_count)
 {
     dns_query_t *               query;
@@ -400,23 +401,31 @@ static unsigned int dns_encode_queries(
     {
         query = &state->query_list[index];
 
-        // Apply outbound filtering
-        // NB: Entries in this switch need to match the source filter switch in dns_decode_queries()
-        switch (query->type)
+        if ((filter_options & OUTBOUND_FILTER_QUERIES) == 0)
         {
-            // These query types are filtered on the owner domain name
-            case DNS_TYPE_SRV:
-            case DNS_TYPE_TXT:
-            case DNS_TYPE_SVCB:
-            case DNS_TYPE_HTTPS:
-            case DNS_TYPE_ANY:
-                allowed = allowed_outbound(send_filter_list, &query->name);
-                break;
+            // Outbound filtering is not applied to queries for this interface
+            allowed = 1;
+        }
+        else
+        {
+            // Apply outbound filtering
+            // NB: Entries in this switch need to match the source filter switch in dns_decode_queries()
+            switch (query->type)
+            {
+                // These query types are filtered on the owner domain name
+                case DNS_TYPE_SRV:
+                case DNS_TYPE_TXT:
+                case DNS_TYPE_SVCB:
+                case DNS_TYPE_HTTPS:
+                case DNS_TYPE_ANY:
+                    allowed = allowed_outbound(send_filter_list, &query->name);
+                    break;
 
-            // Other query types are not filtered
-            default:
-                allowed = 1;
-                break;
+                // Other query types are not filtered
+                default:
+                    allowed = 1;
+                    break;
+            }
         }
 
         if (allowed)
@@ -452,6 +461,7 @@ static unsigned int dns_encode_rrs(
     packet_t *                  send_packet,
     unsigned int                packet_offset,
     const filter_list_t *       send_filter_list,
+    const unsigned int          filter_options,
     unsigned int *              allowed_count)
 {
     dns_rr_t *                  rr;
@@ -488,6 +498,20 @@ static unsigned int dns_encode_rrs(
             case DNS_TYPE_CNAME:
             case DNS_TYPE_DNAME:
                 allowed = allowed_outbound(send_filter_list, &rr->rdata_name);
+                break;
+
+            // These resource types are filtered on the owner domain name only if requested
+            case DNS_TYPE_A:
+            case DNS_TYPE_AAAA:
+            case DNS_TYPE_NSEC:
+                if (filter_options & OUTBOUND_FILTER_ADDRESSES)
+                {
+                    allowed = allowed_outbound(send_filter_list, &rr->name);
+                }
+                else
+                {
+                    allowed = 1;
+                }
                 break;
 
             // Other resource types are not filtered
@@ -590,7 +614,8 @@ unsigned int dns_encode_packet(
     dns_state_t *               dns_state,
     const packet_t *            recv_packet,
     packet_t *                  send_packet,
-    const filter_list_t *       send_filter_list)
+    const filter_list_t *       send_filter_list,
+    const unsigned int          filter_options)
 {
     _dns_state_t *              state = (_dns_state_t *) dns_state;
     dns_header_t *              header;
@@ -606,7 +631,7 @@ unsigned int dns_encode_packet(
     packet_offset = sizeof(dns_header_t);
 
     // Encode the queries
-    packet_offset = dns_encode_queries(state, send_packet, packet_offset, send_filter_list, &query_count);
+    packet_offset = dns_encode_queries(state, send_packet, packet_offset, send_filter_list, filter_options, &query_count);
     if (packet_offset == 0)
     {
         // If there was a problem encoding the queries, drop the packet
@@ -617,7 +642,7 @@ unsigned int dns_encode_packet(
     for (rr_section_type = 0; rr_section_type < NUM_RR_SECTION_TYPES; rr_section_type++)
     {
         packet_offset = dns_encode_rrs(state, rr_section_type, send_packet, packet_offset,
-            send_filter_list,  &rr_count[rr_section_type]);
+            send_filter_list, filter_options, &rr_count[rr_section_type]);
         if (packet_offset == 0)
         {
             // If there was a problem encoding the resource record, drop the packet

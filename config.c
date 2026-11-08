@@ -58,6 +58,8 @@
 #define KEY_DENY_OUTBOUND_FILTERS       "deny-outbound-filters"
 #define KEY_PEER_ALLOW_OUTBOUND_FILTERS "peer-allow-outbound-filters"
 #define KEY_PEER_DENY_OUTBOUND_FILTERS  "peer-deny-outbound-filters"
+#define KEY_OUTBOUND_FILTER_QUERIES     "outbound-filter-queries"
+#define KEY_OUTBOUND_FILTER_ADDRESSES   "outbound-filter-addresses"
 
 // Global config flags
 static unsigned int                     global_disable_ipv4 = 0;
@@ -528,6 +530,36 @@ void read_config(void)
                 }
                 set_interface_peer_outbound_filter_list(interface, peer, DENY, &list_array[1], list_array_count - 1);
             }
+            else if (strcmp(line, KEY_OUTBOUND_FILTER_QUERIES) == 0)
+            {
+                if (strcmp(value, "yes") == 0)
+                {
+                    interface->outbound_filter_options |= OUTBOUND_FILTER_QUERIES;
+                }
+                else if (strcmp(value, "no") == 0)
+                {
+                    interface->outbound_filter_options &= ~OUTBOUND_FILTER_QUERIES;
+                }
+                else
+                {
+                    fatal("%s line %u: Invalid value for %s \"%s\"\n", config_filename, config_lineno, KEY_OUTBOUND_FILTER_QUERIES, value);
+                }
+            }
+            else if (strcmp(line, KEY_OUTBOUND_FILTER_ADDRESSES) == 0)
+            {
+                if (strcmp(value, "yes") == 0)
+                {
+                    interface->outbound_filter_options |= OUTBOUND_FILTER_ADDRESSES;
+                }
+                else if (strcmp(value, "no") == 0)
+                {
+                    interface->outbound_filter_options &= ~OUTBOUND_FILTER_ADDRESSES;
+                }
+                else
+                {
+                    fatal("%s line %u: Invalid value for %s \"%s\"\n", config_filename, config_lineno, KEY_OUTBOUND_FILTER_ADDRESSES, value);
+                }
+            }
             else
             {
                 fatal("%s line %u: Unknown interface parameter \"%s\"\n", config_filename, config_lineno, line);
@@ -703,6 +735,11 @@ static void print_interface_ip(
             printf("   destination %u:\n", count++);
             print_peer_list("    interfaces", peer_filter->peer_count, peer_filter->peer_list);
             print_filter_list("    filter", peer_filter_list[peer_filter_index]->filter);
+            if (peer_filter->filter_options != OUTBOUND_FILTER_DEFAULT)
+            {
+                printf("    filter queries: %s\n", (peer_filter->filter_options & OUTBOUND_FILTER_QUERIES) ? "yes" : "no");
+                printf("    filter addresses: %s\n", (peer_filter->filter_options & OUTBOUND_FILTER_ADDRESSES) ? "yes" : "no");
+            }
         }
     }
     else
@@ -742,6 +779,11 @@ void dump_config(void)
         // Print interface configuration
         print_filter_list("  inbound filter", interface->inbound_filter_list);
         print_filter_list("  outbound filter", interface->outbound_filter_list);
+        if (interface->outbound_filter_options != OUTBOUND_FILTER_DEFAULT)
+        {
+            printf("  outbound filter queries: %s\n", (interface->outbound_filter_options & OUTBOUND_FILTER_QUERIES) ? "yes" : "no");
+            printf("  outbound filter addresses: %s\n", (interface->outbound_filter_options & OUTBOUND_FILTER_ADDRESSES) ? "yes" : "no");
+        }
 
         if (interface->peer_outbound_filter_list)
         {

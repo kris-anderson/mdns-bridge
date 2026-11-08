@@ -198,7 +198,8 @@ static void receive(
         // Does the packet need to be re-encoded?
         if (dest_filter->filter || dns_src_filter_active(local_storage->dns_state))
         {
-            r = dns_encode_packet(local_storage->dns_state, &local_storage->recv_packet, &local_storage->send_packet, dest_filter->filter);
+            r = dns_encode_packet(local_storage->dns_state, &local_storage->recv_packet, &local_storage->send_packet,
+                dest_filter->filter, dest_filter->filter_options);
             if (r == 0)
             {
                 // If everything has been filtered, skip the packet

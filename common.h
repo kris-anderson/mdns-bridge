@@ -116,6 +116,12 @@ typedef struct
 } filter_list_t;
 
 
+// Outbound filter options for an interface
+#define OUTBOUND_FILTER_QUERIES     0x01    // Apply outbound filters to queries
+#define OUTBOUND_FILTER_ADDRESSES   0x02    // Apply outbound filters to A, AAAA and NSEC records
+#define OUTBOUND_FILTER_DEFAULT     OUTBOUND_FILTER_QUERIES
+
+
 // Interface IP type
 typedef enum
 {
@@ -128,6 +134,7 @@ typedef enum
 typedef struct dest_filter_list
 {
     filter_list_t *             filter;
+    unsigned int                filter_options;
     unsigned int                peer_count;
     struct interface *          peer_list[];
 } dest_filter_list_t;
@@ -141,6 +148,7 @@ typedef struct interface
     filter_list_t *             inbound_filter_list;
     filter_list_t *             outbound_filter_list;
     filter_list_t **            peer_outbound_filter_list;
+    unsigned int                outbound_filter_options;
 
     unsigned int                if_index;
     unsigned int                disable_ip[NUM_IP_TYPES];
@@ -299,7 +307,8 @@ extern unsigned int dns_encode_packet(
     dns_state_t *               dns_state,
     const packet_t *            recv_packet,
     packet_t *                  send_packet,
-    const filter_list_t *       send_filter_list);
+    const filter_list_t *       send_filter_list,
+    const unsigned int          filter_options);
 
 // Report if a source filter acted on the current packet
 extern unsigned int dns_src_filter_active(

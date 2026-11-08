@@ -181,6 +181,12 @@ an interface section are optional.
   # for packets from a specific peer
   peer-allow-outbound-filters = igc0, _ipp, _ipps
   peer-deny-outbound-filters = igc1, _airplay
+
+  # Whether outbound filters apply to queries.
+  outbound-filter-queries = yes
+
+  # Whether outbound filters apply to address (A/AAAA) and NSEC records.
+  outbound-filter-addresses = no
 ```
 
 #### The following properties may be defined in interface sections:
@@ -216,6 +222,14 @@ an interface section are optional.
     being the name of the peer interface, followed by the list of filters.
     Any names from the peer interface that do not match one of the filters
     in the list will be discarded from outgoing packets on this interface.
+* `outbound-filter-queries`: If `no`, the outbound filter lists for this
+    interface (interface wide and peer specific) are not applied to
+    queries, so queries for any name are forwarded to the interface.
+    Valid values are `yes` or `no`. The default is `yes`.
+* `outbound-filter-addresses`: If `yes`, the outbound filter lists for
+    this interface (interface wide and peer specific) are also applied to
+    the owner names of A, AAAA and NSEC records. Valid values are `yes` or
+    `no`. The default is `no`.
 
 ##### Notes:
 * The parameter to enable or disable IPv4/IPv6 cannot override the global
@@ -245,6 +259,28 @@ an interface section are optional.
     `deny-outbound-filters`, `peer-deny-outbound-filters`).
 
 * The default behavior is to allow all names inbound and outbound.
+* `outbound-filter-queries` and `outbound-filter-addresses` only have an
+    effect when the interface has an outbound filter list (interface wide
+    or peer specific).
+* An outbound filter list also removes SRV, TXT and ANY queries for names
+    it does not allow. An interface with an allow list that does not include its own
+    services (for example `allow-outbound-filters = _none_`) will not
+    receive queries such as `SRV` or `TXT` for those services, so other
+    interfaces cannot look them up directly. Setting
+    `outbound-filter-queries = no` forwards those queries.
+* Host names are carried in A, AAAA and NSEC records, which are not
+    filtered by default. Setting `outbound-filter-addresses = yes` keeps the
+    host names of devices on other interfaces from being forwarded to this
+    interface unless a filter allows them. Host names can still appear in
+    the names of forwarded queries.
+* To make an interface receive queries but no answers from other
+    interfaces, while its own services stay visible to them, use:
+
+    ```ini
+    allow-outbound-filters = _none_
+    outbound-filter-queries = no
+    outbound-filter-addresses = yes
+    ```
 
 ---
 
@@ -270,6 +306,9 @@ The following mDNS types are supported by mdns-bridge:
 | ANY     | 255  | All record types request  | Owner domain name                |
 
 <sup>*</sup> A and AAAA records are not filtered by name, but link local addresses are never forwarded.
+
+A, AAAA and NSEC records are also filtered by owner domain name on
+interfaces that set `outbound-filter-addresses = yes`.
 
 ### Unsupported mDNS types
 The following mDNS types are not supported by mdns-bridge, and will be
